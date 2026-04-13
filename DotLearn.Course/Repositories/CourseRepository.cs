@@ -34,6 +34,10 @@ public class CourseRepository : ICourseRepository
             // Public view: only Published courses
             query = _context.Courses
                 .Where(c => c.State == CourseState.Published);
+
+            // Optional: filter by instructor (used by Enrollment service to get stats)
+            if (instructorId.HasValue)
+                query = query.Where(c => c.InstructorId == instructorId.Value);
         }
 
         if (!string.IsNullOrWhiteSpace(q))
