@@ -47,6 +47,8 @@ public record CourseSearchRequestDto(
     decimal? MinPrice,
     decimal? MaxPrice,
     string? SortBy,
+    bool InstructorOnly = false,
+    Guid? InstructorId = null,
     int Page = 1,
     int PageSize = 12
 );

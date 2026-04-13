@@ -2,8 +2,6 @@ using DotLearn.Course.Data;
 using DotLearn.Course.Middleware;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
-using Amazon;
-using Kralizek.Extensions.Configuration;
 using Amazon.S3;
 using DotLearn.Course.Repositories;
 using DotLearn.Course.Services;
@@ -20,7 +18,7 @@ builder.Host.UseSerilog();
 // AWS Secrets Manager (Only in non-Development environments)
 if (!builder.Environment.IsDevelopment())
 {
-    // builder.Configuration.AddSecretsManager(region: Amazon.RegionEndpoint.APSoutheast2);
+    // // builder.Configuration.AddSecretsManager(region: Amazon.Amazon.RegionEndpoint.APSoutheast2);
 }
 
 // Add services to the container.
@@ -42,8 +40,21 @@ builder.Services.AddDefaultAWSOptions(new Amazon.Extensions.NETCore.Setup.AWSOpt
 });
 builder.Services.AddAWSService<IAmazonS3>();
 
-// Authentication & Authorization (Placeholder)
-builder.Services.AddAuthentication();
+// Authentication & Authorization
+builder.Services.AddAuthentication(Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = "dotlearn-auth",
+            ValidateAudience = false,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(
+                System.Text.Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Secret"] ?? "placeholder-key-32-chars-minimum!"))
+        };
+    });
 builder.Services.AddAuthorization();
 
 // CORS — DOT-24 Security Lockdown
@@ -83,3 +94,5 @@ app.MapControllers();
 app.MapHealthChecks("/health");
 
 app.Run();
+
+

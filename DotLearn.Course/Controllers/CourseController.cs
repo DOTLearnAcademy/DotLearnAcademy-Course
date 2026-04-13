@@ -22,6 +22,15 @@ public class CourseController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> Search([FromQuery] CourseSearchRequestDto request)
     {
+        // If instructorOnly, inject the caller's ID from JWT
+        if (request.InstructorOnly)
+        {
+            var sub = User.FindFirstValue(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)
+                      ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (Guid.TryParse(sub, out var callerId))
+                request = request with { InstructorId = callerId };
+        }
+
         var result = await _courseService.SearchAsync(request);
         return Ok(result);
     }

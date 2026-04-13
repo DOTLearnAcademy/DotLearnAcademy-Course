@@ -19,10 +19,22 @@ public class CourseRepository : ICourseRepository
     public async Task<(List<Models.Entities.Course> Items, int Total)> SearchAsync(
         string? q, string? category, string? level,
         decimal? minPrice, decimal? maxPrice,
-        string? sortBy, int page, int pageSize)
+        string? sortBy, bool instructorOnly, Guid? instructorId, int page, int pageSize)
     {
-        var query = _context.Courses
-            .Where(c => c.State == CourseState.Published);
+        IQueryable<Models.Entities.Course> query;
+
+        if (instructorOnly && instructorId.HasValue)
+        {
+            // Instructor view: show ALL their courses (Draft, Published, Archived)
+            query = _context.Courses
+                .Where(c => c.InstructorId == instructorId.Value);
+        }
+        else
+        {
+            // Public view: only Published courses
+            query = _context.Courses
+                .Where(c => c.State == CourseState.Published);
+        }
 
         if (!string.IsNullOrWhiteSpace(q))
             query = query.Where(c => c.Title.Contains(q) || c.Description.Contains(q));

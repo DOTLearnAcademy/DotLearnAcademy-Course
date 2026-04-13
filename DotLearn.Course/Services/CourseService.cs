@@ -50,7 +50,8 @@ public class CourseService : ICourseService
         var (items, total) = await _repo.SearchAsync(
             request.Q, request.Category, request.Level,
             request.MinPrice, request.MaxPrice,
-            request.SortBy, request.Page, request.PageSize);
+            request.SortBy, request.InstructorOnly, request.InstructorId,
+            request.Page, request.PageSize);
 
         var totalPages = (int)Math.Ceiling((double)total / request.PageSize);
 
