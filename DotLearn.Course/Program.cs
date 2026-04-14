@@ -3,6 +3,10 @@ using DotLearn.Course.Middleware;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 using Amazon.S3;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using Amazon.S3;
 using DotLearn.Course.Repositories;
 using DotLearn.Course.Services;
 
@@ -41,18 +45,24 @@ builder.Services.AddDefaultAWSOptions(new Amazon.Extensions.NETCore.Setup.AWSOpt
 builder.Services.AddAWSService<IAmazonS3>();
 
 // Authentication & Authorization
-builder.Services.AddAuthentication(Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme)
+var jwksUri = builder.Configuration["Auth:JwksUri"];
+var authority = jwksUri?.Replace("/.well-known/jwks.json", "");
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
-        options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
+        options.Authority = authority;
+        options.RequireHttpsMetadata = false;
+
+        options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
             ValidIssuer = "dotlearn-auth",
             ValidateAudience = false,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(
-                System.Text.Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Secret"] ?? "placeholder-key-32-chars-minimum!"))
+            NameClaimType = "sub",
+            RoleClaimType = ClaimTypes.Role
         };
     });
 builder.Services.AddAuthorization();

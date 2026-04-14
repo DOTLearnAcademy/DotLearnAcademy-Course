@@ -3,6 +3,7 @@ using DotLearn.Course.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using System.IdentityModel.Tokens.Jwt;
 
 namespace DotLearn.Course.Controllers;
 
@@ -177,9 +178,18 @@ public class CourseController : ControllerBase
     }
 
     // ── Helpers ──────────────────────────────────────────────────
-    private Guid GetUserId() =>
-        Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)
-            ?? throw new UnauthorizedAccessException("User ID not found in token."));
+    private Guid GetUserId()
+    {
+        var userId =
+            User.FindFirstValue(JwtRegisteredClaimNames.Sub) ??
+            User.FindFirstValue(ClaimTypes.NameIdentifier) ??
+            User.FindFirst("sub")?.Value;
+
+        if (string.IsNullOrWhiteSpace(userId))
+            throw new UnauthorizedAccessException("User ID not found in token.");
+
+        return Guid.Parse(userId);
+    }
 
     private string GetUserRole() =>
         User.FindFirstValue(ClaimTypes.Role)
