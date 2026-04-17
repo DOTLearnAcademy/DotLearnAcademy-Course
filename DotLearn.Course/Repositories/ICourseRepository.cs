@@ -10,4 +10,5 @@ public interface ICourseRepository
         string? sortBy, bool instructorOnly, Guid? instructorId, int page, int pageSize);
     Task AddAsync(Models.Entities.Course course);
     Task UpdateAsync(Models.Entities.Course course);
+    Task IncrementEnrollmentCountAsync(Guid courseId);
 }

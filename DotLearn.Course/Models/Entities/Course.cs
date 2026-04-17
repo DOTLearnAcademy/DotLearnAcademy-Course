@@ -15,11 +15,14 @@ public class Course
     public int EnrollmentCount { get; set; } = 0;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? PublishedAt { get; set; }
+    public string? RejectionReason { get; set; }
 }
 
 public enum CourseState
 {
     Draft = 0,
     Published = 1,
-    Archived = 2
+    Archived = 2,
+    PendingApproval = 3,
+    Rejected = 4
 }

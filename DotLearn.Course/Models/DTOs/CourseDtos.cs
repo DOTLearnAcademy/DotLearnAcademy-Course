@@ -29,7 +29,8 @@ public record CourseResponseDto(
     double AverageRating,
     int EnrollmentCount,
     DateTime CreatedAt,
-    DateTime? PublishedAt
+    DateTime? PublishedAt,
+    string? RejectionReason = null
 );
 
 public record PaginatedResponseDto<T>(
@@ -55,4 +56,13 @@ public record CourseSearchRequestDto(
 
 public record ThumbnailConfirmDto(string S3Key);
 
-public record PriceResponseDto(Guid CourseId, decimal Price);
+public record PriceResponseDto(
+    Guid CourseId, 
+    string Title,
+    decimal Price, 
+    string Currency,
+    bool IsPublished,
+    bool IsFree
+);
+
+public record RejectCourseRequestDto(string Reason);

@@ -83,4 +83,14 @@ public class CourseRepository : ICourseRepository
         _context.Courses.Update(course);
         await _context.SaveChangesAsync();
     }
+
+    public async Task IncrementEnrollmentCountAsync(Guid courseId)
+    {
+        var course = await _context.Courses.FindAsync(courseId);
+        if (course == null)
+            return;
+
+        course.EnrollmentCount += 1;
+        await _context.SaveChangesAsync();
+    }
 }

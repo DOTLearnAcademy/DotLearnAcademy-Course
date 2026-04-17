@@ -86,14 +86,13 @@ public class CourseService : ICourseService
         var course = await GetCourseOrThrow(id);
         ValidateOwnership(course, requesterId, requesterRole);
 
-        if (course.State != CourseState.Draft)
-            throw new InvalidOperationException("Only Draft courses can be published.");
+        if (course.State != CourseState.Draft && course.State != CourseState.Rejected)
+            throw new InvalidOperationException("Only Draft or Rejected courses can be submitted for approval.");
 
-        course.State = CourseState.Published;
-        course.PublishedAt = DateTime.UtcNow;
+        course.State = CourseState.PendingApproval;
+        course.RejectionReason = null; // Clear rejection on resubmit
 
         await _repo.UpdateAsync(course);
-        // TODO: Publish CoursePublished SQS event in Phase 4
         return MapToDto(course);
     }
 
@@ -137,7 +136,45 @@ public class CourseService : ICourseService
     public async Task<PriceResponseDto> GetPriceAsync(Guid courseId)
     {
         var course = await GetCourseOrThrow(courseId);
-        return new PriceResponseDto(course.Id, course.Price);
+        return new PriceResponseDto(
+            course.Id, 
+            course.Title,
+            course.Price, 
+            "inr", // default currency as per instruction
+            course.State == CourseState.Published,
+            course.Price <= 0
+        );
+    }
+
+    // ── Admin Operations ─────────────────────────────────────────
+
+    public async Task<CourseResponseDto> ApproveCourseAsync(Guid id, Guid adminId)
+    {
+        var course = await GetCourseOrThrow(id);
+
+        if (course.State != CourseState.PendingApproval)
+            throw new InvalidOperationException("Only courses awaiting approval can be approved.");
+
+        course.State = CourseState.Published;
+        course.PublishedAt = DateTime.UtcNow;
+
+        await _repo.UpdateAsync(course);
+        // TODO: Publish CoursePublished SQS event in Phase 4
+        return MapToDto(course);
+    }
+
+    public async Task<CourseResponseDto> RejectCourseAsync(Guid id, Guid adminId, string reason)
+    {
+        var course = await GetCourseOrThrow(id);
+
+        if (course.State != CourseState.PendingApproval)
+            throw new InvalidOperationException("Only courses awaiting approval can be rejected.");
+
+        course.State = CourseState.Rejected;
+        course.RejectionReason = reason;
+
+        await _repo.UpdateAsync(course);
+        return MapToDto(course);
     }
 
     // ── Helpers ──────────────────────────────────────────────────

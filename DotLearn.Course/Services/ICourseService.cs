@@ -13,4 +13,8 @@ public interface ICourseService
     Task<string> GetThumbnailUploadUrlAsync(Guid courseId, Guid requesterId);
     Task ConfirmThumbnailAsync(Guid courseId, string s3Key, Guid requesterId);
     Task<PriceResponseDto> GetPriceAsync(Guid courseId);
+    
+    // Admin Operations
+    Task<CourseResponseDto> ApproveCourseAsync(Guid id, Guid adminId);
+    Task<CourseResponseDto> RejectCourseAsync(Guid id, Guid adminId, string reason);
 }
