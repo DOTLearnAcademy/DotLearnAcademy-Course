@@ -1,5 +1,6 @@
 using DotLearn.Course.Models.DTOs;
 using DotLearn.Course.Services;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -26,10 +27,17 @@ public class CourseController : ControllerBase
         // If instructorOnly, inject the caller's ID from JWT
         if (request.InstructorOnly)
         {
-            var sub = User.FindFirstValue(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)
-                      ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
+            // Force authentication so instructor-only views never fall back to public data
+            // when JWT is missing or not resolved for this request.
+            var principal = (await HttpContext.AuthenticateAsync()).Principal ?? User;
+
+            var sub = principal.FindFirstValue(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)
+                      ?? principal.FindFirstValue(ClaimTypes.NameIdentifier)
+                      ?? principal.FindFirstValue("sub");
             if (Guid.TryParse(sub, out var callerId))
                 request = request with { InstructorId = callerId };
+            else
+                return Unauthorized(new { error = "Instructor-only view requires authentication." });
         }
 
         var result = await _courseService.SearchAsync(request);

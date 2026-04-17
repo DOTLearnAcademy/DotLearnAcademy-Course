@@ -52,6 +52,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
         options.RequireHttpsMetadata = false;
+        options.MapInboundClaims = false;
 
         options.TokenValidationParameters = new TokenValidationParameters
         {
@@ -68,7 +69,32 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 return jwks.GetSigningKeys();
             },
             NameClaimType = "sub",
-            RoleClaimType = ClaimTypes.Role
+            RoleClaimType = "role"
+        };
+
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = context =>
+            {
+                // Normalize role claims so [Authorize(Roles = "...")] works
+                // regardless of whether token used "role", "roles" or schema URI.
+                if (context.Principal?.Identity is ClaimsIdentity identity)
+                {
+                    var roleCandidates = identity.FindAll("role").Select(c => c.Value)
+                        .Concat(identity.FindAll("roles").Select(c => c.Value))
+                        .Concat(identity.FindAll(ClaimTypes.Role).Select(c => c.Value))
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToList();
+
+                    foreach (var role in roleCandidates)
+                    {
+                        if (!identity.HasClaim(ClaimTypes.Role, role))
+                            identity.AddClaim(new Claim(ClaimTypes.Role, role));
+                    }
+                }
+
+                return Task.CompletedTask;
+            }
         };
     });
 builder.Services.AddAuthorization();

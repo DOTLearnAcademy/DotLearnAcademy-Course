@@ -86,11 +86,11 @@ public class CourseService : ICourseService
         var course = await GetCourseOrThrow(id);
         ValidateOwnership(course, requesterId, requesterRole);
 
-        if (course.State != CourseState.Draft && course.State != CourseState.Rejected)
-            throw new InvalidOperationException("Only Draft or Rejected courses can be submitted for approval.");
+        if (course.State != CourseState.Draft)
+            throw new InvalidOperationException("Only Draft courses can be published.");
 
-        course.State = CourseState.PendingApproval;
-        course.RejectionReason = null; // Clear rejection on resubmit
+        course.State = CourseState.Published;
+        course.PublishedAt = DateTime.UtcNow;
 
         await _repo.UpdateAsync(course);
         return MapToDto(course);
@@ -175,6 +175,12 @@ public class CourseService : ICourseService
 
         await _repo.UpdateAsync(course);
         return MapToDto(course);
+    }
+
+    public async Task<List<CourseResponseDto>> GetPendingCoursesAsync()
+    {
+        var courses = await _repo.GetPendingCoursesAsync();
+        return courses.Select(MapToDto).ToList();
     }
 
     // ── Helpers ──────────────────────────────────────────────────

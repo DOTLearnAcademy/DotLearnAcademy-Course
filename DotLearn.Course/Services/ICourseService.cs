@@ -15,6 +15,7 @@ public interface ICourseService
     Task<PriceResponseDto> GetPriceAsync(Guid courseId);
     
     // Admin Operations
+    Task<List<CourseResponseDto>> GetPendingCoursesAsync();
     Task<CourseResponseDto> ApproveCourseAsync(Guid id, Guid adminId);
     Task<CourseResponseDto> RejectCourseAsync(Guid id, Guid adminId, string reason);
 }

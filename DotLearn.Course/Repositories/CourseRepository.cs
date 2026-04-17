@@ -93,4 +93,12 @@ public class CourseRepository : ICourseRepository
         course.EnrollmentCount += 1;
         await _context.SaveChangesAsync();
     }
+
+    public async Task<List<Models.Entities.Course>> GetPendingCoursesAsync()
+    {
+        return await _context.Courses
+            .Where(c => c.State == CourseState.PendingApproval)
+            .OrderByDescending(c => c.CreatedAt)
+            .ToListAsync();
+    }
 }

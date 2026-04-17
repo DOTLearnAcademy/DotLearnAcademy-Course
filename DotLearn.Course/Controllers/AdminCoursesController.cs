@@ -18,6 +18,13 @@ public class AdminCoursesController : ControllerBase
         _courseService = courseService;
     }
 
+    [HttpGet("pending")]
+    public async Task<IActionResult> GetPendingCourses()
+    {
+        var courses = await _courseService.GetPendingCoursesAsync();
+        return Ok(courses);
+    }
+
     [HttpPut("{id:guid}/approve")]
     public async Task<IActionResult> ApproveCourse(Guid id)
     {
