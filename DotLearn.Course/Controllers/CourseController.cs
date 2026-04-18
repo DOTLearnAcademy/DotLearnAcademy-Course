@@ -1,0 +1,205 @@
+using DotLearn.Course.Models.DTOs;
+using DotLearn.Course.Services;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
+using System.IdentityModel.Tokens.Jwt;
+
+namespace DotLearn.Course.Controllers;
+
+[ApiController]
+[Route("api/courses")]
+public class CourseController : ControllerBase
+{
+    private readonly ICourseService _courseService;
+
+    public CourseController(ICourseService courseService)
+    {
+        _courseService = courseService;
+    }
+
+    // GET /api/courses
+    [HttpGet]
+    [AllowAnonymous]
+    public async Task<IActionResult> Search([FromQuery] CourseSearchRequestDto request)
+    {
+        // If instructorOnly, inject the caller's ID from JWT
+        if (request.InstructorOnly)
+        {
+            // Force authentication so instructor-only views never fall back to public data
+            // when JWT is missing or not resolved for this request.
+            var principal = (await HttpContext.AuthenticateAsync()).Principal ?? User;
+
+            var sub = principal.FindFirstValue(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)
+                      ?? principal.FindFirstValue(ClaimTypes.NameIdentifier)
+                      ?? principal.FindFirstValue("sub");
+            if (Guid.TryParse(sub, out var callerId))
+                request = request with { InstructorId = callerId };
+            else
+                return Unauthorized(new { error = "Instructor-only view requires authentication." });
+        }
+
+        var result = await _courseService.SearchAsync(request);
+        return Ok(result);
+    }
+
+    // GET /api/courses/{id}
+    [HttpGet("{id}")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetById(Guid id)
+    {
+        var course = await _courseService.GetByIdAsync(id);
+        if (course == null) return NotFound(new { error = "Course not found." });
+        return Ok(course);
+    }
+
+    // POST /api/courses
+    [HttpPost]
+    [Authorize(Roles = "Instructor,Admin")]
+    public async Task<IActionResult> Create([FromBody] CreateCourseRequestDto request)
+    {
+        var instructorId = GetUserId();
+        var result = await _courseService.CreateAsync(request, instructorId);
+        return StatusCode(201, result);
+    }
+
+    // PUT /api/courses/{id}
+    [HttpPut("{id}")]
+    [Authorize(Roles = "Instructor,Admin")]
+    public async Task<IActionResult> Update(Guid id,
+        [FromBody] UpdateCourseRequestDto request)
+    {
+        try
+        {
+            var result = await _courseService.UpdateAsync(
+                id, request, GetUserId(), GetUserRole());
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { error = ex.Message });
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { error = ex.Message });
+        }
+    }
+
+    // PUT /api/courses/{id}/publish
+    [HttpPut("{id}/publish")]
+    [Authorize(Roles = "Instructor,Admin")]
+    public async Task<IActionResult> Publish(Guid id)
+    {
+        try
+        {
+            var result = await _courseService.PublishAsync(
+                id, GetUserId(), GetUserRole());
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { error = ex.Message });
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { error = ex.Message });
+        }
+    }
+
+    // DELETE /api/courses/{id} → archives (soft delete)
+    [HttpDelete("{id}")]
+    [Authorize(Roles = "Instructor,Admin")]
+    public async Task<IActionResult> Archive(Guid id)
+    {
+        try
+        {
+            var result = await _courseService.ArchiveAsync(
+                id, GetUserId(), GetUserRole());
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { error = ex.Message });
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+    }
+
+    // POST /api/courses/{id}/thumbnail-upload-url
+    [HttpPost("{id}/thumbnail-upload-url")]
+    [Authorize(Roles = "Instructor,Admin")]
+    public async Task<IActionResult> GetThumbnailUploadUrl(Guid id)
+    {
+        try
+        {
+            var url = await _courseService.GetThumbnailUploadUrlAsync(id, GetUserId());
+            return Ok(new { uploadUrl = url });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { error = ex.Message });
+        }
+    }
+
+    // PUT /api/courses/{id}/thumbnail-confirm
+    [HttpPut("{id}/thumbnail-confirm")]
+    [Authorize(Roles = "Instructor,Admin")]
+    public async Task<IActionResult> ConfirmThumbnail(Guid id,
+        [FromBody] ThumbnailConfirmDto request)
+    {
+        try
+        {
+            await _courseService.ConfirmThumbnailAsync(id, request.S3Key, GetUserId());
+            return Ok(new { message = "Thumbnail updated." });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { error = ex.Message });
+        }
+    }
+
+    // GET /internal/courses/{id}/price  ← internal only
+    [HttpGet("/internal/courses/{id}/price")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetPrice(Guid id)
+    {
+        try
+        {
+            var result = await _courseService.GetPriceAsync(id);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { error = ex.Message });
+        }
+    }
+
+    // ── Helpers ──────────────────────────────────────────────────
+    private Guid GetUserId()
+    {
+        var userId =
+            User.FindFirstValue(JwtRegisteredClaimNames.Sub) ??
+            User.FindFirstValue(ClaimTypes.NameIdentifier) ??
+            User.FindFirst("sub")?.Value;
+
+        if (string.IsNullOrWhiteSpace(userId))
+            throw new UnauthorizedAccessException("User ID not found in token.");
+
+        return Guid.Parse(userId);
+    }
+
+    private string GetUserRole() =>
+        User.FindFirstValue(ClaimTypes.Role)
+            ?? throw new UnauthorizedAccessException("Role not found in token.");
+}
